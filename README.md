@@ -254,7 +254,7 @@ logging:
 ## 项目结构
 
 ```
-windows-server-monitor/
+server-monitor/
 ├── config/
 │   └── config.yaml          # 配置文件
 ├── logs/                    # 日志目录（自动创建）
