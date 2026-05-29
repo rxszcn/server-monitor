@@ -41,7 +41,7 @@ process_monitor:
 
 webhook:
   urls:
-    - "https://open.feishu.cn/open-apis/bot/v2/hook/5f1577d8-d6cf-4b8c-9868-431bbc946980"
+    - "https://open.feishu.cn/open-apis/bot/v2/hook/your-feishu-bot-key"
   timeout: 10
   retry_count: 3
   retry_interval: 5
