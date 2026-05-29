@@ -5,8 +5,6 @@ logs/
 *.log
 .env
 *.bak
-dashboard.png
-bigscreen.png
 .playwright-cli/
 docs/
 .DS_Store
