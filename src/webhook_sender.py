@@ -69,9 +69,15 @@ class WebhookSender:
                         headers={'Content-Type': 'application/json'}
                     )
                     if 200 <= resp.status_code < 300:
-                        success += 1
-                        logger.info(f"告警推送成功: {url}")
-                        break
+                        # 飞书/钉钉/企微即使返回200，body中可能包含错误码
+                        body_ok = self._check_response(resp, url)
+                        if body_ok:
+                            success += 1
+                            logger.info(f"告警推送成功: {url}")
+                            break
+                        # body有错误码，继续重试
+                        if attempt < retry_count - 1:
+                            time.sleep(retry_interval)
                     else:
                         # 非2xx重试
                         logger.warning(
@@ -143,6 +149,19 @@ class WebhookSender:
         else:
             # 通用格式：直接发送标准 JSON
             return payload
+
+    @staticmethod
+    def _check_response(resp, url):
+        """检查响应体中的业务错误码（飞书/钉钉/企微可能返回200但code≠0）"""
+        try:
+            body = resp.json()
+            code = body.get('code') or body.get('errcode') or body.get('Status') or body.get('StatusCode')
+            if code is not None and code != 0:
+                logger.warning(f"Webhook返回业务错误: {url}, code={code}, msg={body.get('msg', body.get('errmsg', ''))}")
+                return False
+        except Exception:
+            pass  # 无法解析JSON就当成功
+        return True
 
     @staticmethod
     def _build_text_message(payload):
