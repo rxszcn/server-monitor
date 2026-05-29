@@ -110,7 +110,7 @@ python main.py -s remove
 
 ```yaml
 server:
-  name: "Windows-Server-01"  # 服务器标识，会出现在告警消息中
+  name: "Server-01"          # 服务器标识，会出现在告警消息中
 ```
 
 ### 系统资源监控
