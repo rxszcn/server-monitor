@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>服务器监控大屏</title>
+    <style>
+        /* ============================================
+           设计系统: Cyberpunk UI × Glassmorphism
+           来源: ui-ux-pro-max 技能搜索
+           - Retro-Futurism: 霓虹发光 + CRT扫描线
+           - Glassmorphism: 毛玻璃卡片 + 半透明层叠
+           - UX: ease-out缓动 + reduced-motion支持
+           ============================================ */
+        :root {
+            --bg-root: #060B14;
+            --bg-card: rgba(13,19,33,0.18);
+            --accent: #0080FF;
+            --accent-cyan: #00E5FF;
+            --green: #00FF41;
+            --amber: #FFB300;
+            --red: #FF1744;
+            --text: #E8EDF5;
+            --text-dim: #8899B4;
+            --text-muted: #556885;
+            --glass-blur: 4px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+            background: var(--bg-root);
+            color: var(--text);
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            padding: 14px 20px;
+            gap: 14px;
+            position: relative;
+            /* 多层背景 */
+            background-image:
+                /* 网格线 - 6% 不透明度 */
+                linear-gradient(rgba(0,128,255,0.06) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,128,255,0.06) 1px, transparent 1px),
+                /* 光晕层 - 15-25% 峰值不透明度 */
+                radial-gradient(ellipse 60% 50% at 10% 10%, rgba(0,128,255,0.18) 0%, transparent 60%),
+                radial-gradient(ellipse 50% 45% at 90% 85%, rgba(0,229,255,0.14) 0%, transparent 55%),
+                radial-gradient(ellipse 40% 40% at 50% 35%, rgba(179,136,255,0.12) 0%, transparent 50%),
+                radial-gradient(ellipse 35% 35% at 30% 70%, rgba(255,179,0,0.10) 0%, transparent 50%),
+                radial-gradient(ellipse 30% 30% at 75% 20%, rgba(0,128,255,0.12) 0%, transparent 50%);
+            background-size:
+                60px 60px, 60px 60px,
+                100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+            background-attachment: fixed;
+        }
+
+        /* 浮动光斑 - 5层大光晕漂移动画 */
+        body::before {
+            content: '';
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none; z-index: 1;
+            background:
+                radial-gradient(circle 350px at 12% 18%, rgba(0,128,255,0.16) 0%, transparent 100%),
+                radial-gradient(circle 300px at 82% 78%, rgba(0,229,255,0.13) 0%, transparent 100%),
+                radial-gradient(circle 250px at 38% 52%, rgba(179,136,255,0.11) 0%, transparent 100%),
+                radial-gradient(circle 220px at 72% 12%, rgba(0,128,255,0.12) 0%, transparent 100%),
+                radial-gradient(circle 260px at 48% 88%, rgba(255,179,0,0.10) 0%, transparent 100%);
+            animation: float-blobs 18s ease-in-out infinite;
+        }
+        @keyframes float-blobs {
+            0%, 100% { background-position: 0% 0%, 0% 0%, 0% 0%, 0% 0%, 0% 0%; opacity: 0.7; }
+            20%      { background-position: 3% -4%, -2% 3%, 4% 2%, -3% -3%, 2% 4%; opacity: 1; }
+            40%      { background-position: -2% -2%, 3% -3%, -3% 4%, 4% 2%, -4% -2%; opacity: 0.6; }
+            60%      { background-position: 4% 3%, -4% 2%, 2% -3%, -2% 4%, 3% -4%; opacity: 0.85; }
+            80%      { background-position: -3% 2%, 2% 4%, -4% -2%, 3% -4%, -2% 3%; opacity: 0.65; }
+        }
+
+        /* CRT扫描线 */
+        body::after {
+            content: '';
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0,0,0,0.03) 2px,
+                rgba(0,0,0,0.03) 4px
+            );
+            pointer-events: none; z-index: 9999;
+        }
+
+        /* 垂直光束 - 加宽加亮 */
+        .light-beam {
+            position: fixed; pointer-events: none; z-index: 1;
+            background: linear-gradient(180deg, rgba(0,128,255,0.15) 0%, rgba(0,229,255,0.06) 40%, transparent 100%);
+            animation: beam-drift 14s ease-in-out infinite;
+        }
+        .light-beam:nth-child(1) { left: 8%;  top: 0; width: 2px; height: 65%; animation-delay: 0s; }
+        .light-beam:nth-child(2) { left: 42%; top: 0; width: 2px; height: 50%; animation-delay: -5s; }
+        .light-beam:nth-child(3) { left: 72%; top: 0; width: 2px; height: 58%; animation-delay: -9s; }
+        .light-beam:nth-child(4) { left: 92%; top: 0; width: 2px; height: 42%; animation-delay: -3s; }
+        @keyframes beam-drift {
+            0%, 100% { transform: translateX(0); opacity: 0.5; }
+            25%      { transform: translateX(40px); opacity: 0.9; }
+            50%      { transform: translateX(-25px); opacity: 0.35; }
+            75%      { transform: translateX(15px); opacity: 0.75; }
+        }
+
+        /* ===== 减少动画偏好 ===== */
+        @media (prefers-reduced-motion: reduce) {
+            body::before, .light-beam, .pulse-dot, .progress-fill::after {
+                animation: none !important;
+            }
+            .card.alert-active { animation: none !important; }
+        }
+
+        /* ===== 顶部栏 - 玻璃拟态 ===== */
+        .topbar {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 0 12px; flex-shrink: 0; height: 50px;
+            background: rgba(13,19,33,0.50);
+            backdrop-filter: blur(var(--glass-blur));
+            -webkit-backdrop-filter: blur(var(--glass-blur));
+            border: 1px solid rgba(0,128,255,0.15);
+            border-radius: 6px;
+            position: relative; z-index: 100;
+        }
+        .topbar::before {
+            content: '';
+            position: absolute; bottom: -1px; left: 12%; width: 76%; height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(0,128,255,0.4), transparent);
+        }
+        .topbar-left { display: flex; align-items: center; gap: 12px; }
+        .pulse-dot {
+            width: 10px; height: 10px; border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 8px var(--green), 0 0 20px var(--green), 0 0 36px rgba(0,255,65,0.35);
+            animation: pulse 2s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 8px var(--green), 0 0 20px var(--green), 0 0 36px rgba(0,255,65,0.35); }
+            50% { box-shadow: 0 0 4px var(--green), 0 0 10px var(--green), 0 0 16px rgba(0,255,65,0.2); opacity: 0.5; }
+        }
+        .topbar h1 {
+            font-family: "Microsoft YaHei", sans-serif;
+            font-size: 20px; font-weight: 700; letter-spacing: 6px;
+            background: linear-gradient(180deg, #E8EDF5 0%, #8899B4 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: none;
+        }
+        .topbar-center { display: flex; align-items: center; gap: 18px; }
+        .topbar-tag { font-size: 12px; color: var(--text-dim); letter-spacing: 1px; display: flex; align-items: center; gap: 6px; }
+        .topbar-tag .label { color: var(--text-muted); font-size: 10px; }
+        .topbar-tag .value { color: var(--accent-cyan); font-weight: 600; font-size: 13px; }
+        .topbar-divider { width: 1px; height: 16px; background: rgba(0,128,255,0.12); }
+        .topbar-right {
+            font-size: 26px; font-weight: 700;
+            font-family: "Consolas", "Microsoft YaHei", monospace;
+            letter-spacing: 3px; color: var(--text);
+            text-shadow: 0 0 20px rgba(0,128,255,0.35);
+        }
+
+        /* ===== 摘要卡片 - 玻璃拟态 + 色差边框 ===== */
+        .summary-bar { display: flex; gap: 14px; flex-shrink: 0; position: relative; z-index: 100; }
+        .summary-card {
+            flex: 1;
+            background: var(--bg-card);
+            backdrop-filter: blur(calc(var(--glass-blur) * 0.7));
+            -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 0.7));
+            border: 1px solid rgba(0,128,255,0.14);
+            border-radius: 6px;
+            padding: 10px 12px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            position: relative; overflow: hidden;
+            transition: border-color 0.3s ease-out, box-shadow 0.3s ease-out;
+        }
+        .summary-card:hover {
+            border-color: rgba(0,128,255,0.2);
+            box-shadow: 0 0 20px rgba(0,128,255,0.06);
+        }
+        /* 顶部微光 */
+        .summary-card::before {
+            content: '';
+            position: absolute; top: 0; left: 20%; right: 20%; height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+        }
+        /* 色差效果 - 底部RGB分离微光 */
+        .summary-card::after {
+            content: '';
+            position: absolute; bottom: -1px; left: 10%; right: 10%; height: 2px;
+            background:
+                linear-gradient(90deg, transparent, rgba(0,128,255,0.08) 30%, rgba(0,255,65,0.06) 70%, transparent);
+            filter: blur(1px);
+        }
+        .summary-value {
+            font-family: "Consolas", "Microsoft YaHei", monospace;
+            font-size: 30px; font-weight: 700; line-height: 1;
+            text-shadow: 0 0 16px currentColor;
+            position: relative; z-index: 1;
+        }
+        .summary-label {
+            font-size: 10px; color: var(--text-muted); margin-top: 3px;
+            letter-spacing: 2px; position: relative; z-index: 1;
+        }
+
+        /* ===== 主网格 ===== */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 14px;
+            flex: 1;
+            min-height: 0;
+            position: relative; z-index: 100;
+        }
+
+        /* ===== 主卡片 - 玻璃拟态 + 色差角标 ===== */
+        .card {
+            background: var(--bg-card);
+            backdrop-filter: blur(var(--glass-blur));
+            -webkit-backdrop-filter: blur(var(--glass-blur));
+            border: 1px solid rgba(0,128,255,0.18);
+            border-radius: 6px;
+            padding: 14px 16px;
+            display: flex; flex-direction: column;
+            overflow: hidden; position: relative;
+            transition: border-color 0.3s ease-out, box-shadow 0.3s ease-out;
+        }
+        .card:hover {
+            border-color: rgba(0,128,255,0.25);
+            box-shadow: 0 0 30px rgba(0,128,255,0.06);
+        }
+        /* 告警状态 */
+        .card.alert-active {
+            border-color: rgba(255,23,68,0.4);
+            animation: alert-glow 2.5s ease-in-out infinite;
+        }
+        @keyframes alert-glow {
+            0%, 100% { box-shadow: 0 0 30px rgba(255,23,68,0.1), inset 0 0 40px rgba(255,23,68,0.03); }
+            50%      { box-shadow: 0 0 45px rgba(255,23,68,0.18), inset 0 0 50px rgba(255,23,68,0.06); }
+        }
+        .card-title {
+            font-size: 12px; font-weight: 600; color: var(--text-dim);
+            letter-spacing: 2px; margin: -14px -16px 10px -16px;
+            padding: 10px 16px; flex-shrink: 0;
+            display: flex; align-items: center; gap: 8px;
+            background: rgba(13,19,33,0.50); /* 半透，比body实 */
+            border-bottom: 1px solid rgba(0,128,255,0.25);
+        }
+        .card-title::before {
+            content: '';
+            width: 3px; height: 14px;
+            background: var(--accent);
+            border-radius: 2px;
+            box-shadow: 0 0 10px rgba(0,128,255,0.5);
+        }
+        .card.alert-active .card-title::before {
+            background: var(--red);
+            box-shadow: 0 0 10px rgba(255,23,68,0.5);
+        }
+        .card-body {
+            flex: 1; display: flex; flex-direction: column; justify-content: flex-start;
+            min-height: 0;
+            position: relative;
+        }
+        /* 列表卡片内自动滚动 */
+        .scroll-list {
+            overflow-y: auto;
+            scrollbar-width: none; /* Firefox隐藏滚动条 */
+            position: relative;
+            flex: 1;
+        }
+        .scroll-list::-webkit-scrollbar {
+            display: none; /* Chrome隐藏滚动条 */
+        }
+        /* CPU和内存卡片居中填充 */
+        #card-cpu .card-body, #card-mem .card-body { justify-content: center; }
+        .card-body::-webkit-scrollbar { width: 3px; }
+        .card-body::-webkit-scrollbar-thumb { background: rgba(0,128,255,0.15); border-radius: 3px; }
+
+        /* ===== 大数值 - 霓虹发光 ===== */
+        .gauge-section { text-align: center; margin-bottom: 6px; }
+        .gauge-value {
+            font-family: "Consolas", "Microsoft YaHei", monospace;
+            font-size: 50px; font-weight: 700; line-height: 1;
+            transition: color 0.6s ease-out, text-shadow 0.6s ease-out;
+            text-shadow: 0 0 24px currentColor, 0 0 48px currentColor;
+            will-change: color;
+        }
+        .gauge-sub { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+
+        /* ===== CPU/内存可视化区 ===== */
+        .cpu-viz {
+            display: flex; align-items: center; gap: 10px;
+            margin-bottom: 6px;
+            overflow: hidden;
+        }
+        .cpu-wave {
+            flex: 1; min-width: 0;
+            border-radius: 4px;
+            background: #0D1321;
+        }
+        /* CPU多行堆叠 */
+        .cpu-pct-stack {
+            display: flex; flex-direction: column; gap: 2px;
+            white-space: nowrap; min-width: 70px;
+        }
+        .cpu-pct-row {
+            font-family: "Consolas", "Microsoft YaHei", monospace;
+            font-size: 15px; font-weight: 600;
+            transition: all 0.5s ease-out;
+            padding: 2px 6px; border-radius: 3px;
+        }
+        .cpu-pct-row.active {
+            font-size: 20px; font-weight: 700;
+            text-shadow: 0 0 12px currentColor, 0 0 24px currentColor;
+            background: rgba(0,128,255,0.08);
+            border: 1px solid rgba(0,128,255,0.2);
+        }
+        .cpu-pct-row.inactive {
+            color: var(--text-muted);
+            text-shadow: none;
+            font-size: 13px;
+        }
+        /* ===== 进度条 - 发光+扫光 ===== */
+        .progress-track {
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 20px; height: 6px; overflow: hidden; margin: 5px 0;
+            position: relative;
+        }
+        .progress-fill {
+            height: 100%; border-radius: 20px;
+            transition: width 0.6s ease-out, background 0.6s ease-out;
+            box-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
+        }
+        .progress-track::after {
+            content: '';
+            position: absolute; top: 0; left: -20%; width: 20%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+            animation: scan 3s ease-in-out infinite;
+            pointer-events: none; z-index: 1;
+        }
+        @keyframes scan {
+            0% { left: -20%; }
+            100% { left: 100%; }
+        }
+        .progress-info {
+            display: flex; justify-content: space-between;
+            font-size: 10px; color: var(--text-muted);
+        }
+
+        /* ===== 状态行 ===== */
+        .status-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 5px 8px;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            font-size: 12px;
+            transition: background 0.2s ease-out;
+        }
+        .status-row:last-child { border-bottom: none; }
+        /* 状态变化闪烁 */
+        .status-changed {
+            animation: flash-change 0.6s ease-out;
+        }
+        @keyframes flash-change {
+            0% { background: rgba(0,128,255,0.15); }
+            100% { background: transparent; }
+        }
+        .status-name { display: flex; align-items: center; gap: 8px; color: var(--text-dim); }
+        .status-dot {
+            width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+            transition: box-shadow 0.3s ease-out;
+        }
+        .dot-ok {
+            background: var(--green);
+            box-shadow: 0 0 6px var(--green), 0 0 14px rgba(0,255,65,0.45);
+        }
+        .dot-err {
+            background: var(--red);
+            box-shadow: 0 0 6px var(--red), 0 0 14px rgba(255,23,68,0.45);
+            animation: blink 1s ease-in-out infinite;
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.15; }
+        }
+
+        .pill {
+            display: inline-block; padding: 3px 10px; border-radius: 3px;
+            font-size: 10px; font-weight: 600; letter-spacing: 1px;
+        }
+        .pill-up, .pill-active {
+            background: transparent; color: var(--green);
+            border: 1px solid rgba(0,255,65,0.25);
+        }
+        .pill-down, .pill-dead {
+            background: transparent; color: var(--red);
+            border: 1px solid rgba(255,23,68,0.25);
+        }
+        .pill-alert {
+            background: transparent; color: var(--red);
+            border: 1px solid rgba(255,23,68,0.35);
+            animation: blink 1s ease-in-out infinite;
+        }
+        .pill-normal {
+            background: transparent; color: var(--green);
+            border: 1px solid rgba(0,255,65,0.15);
+        }
+        .pill-count {
+            background: transparent; color: var(--accent-cyan);
+            border: 1px solid rgba(0,128,255,0.15);
+            margin-left: 4px;
+        }
+
+        /* ===== 磁盘项 ===== */
+        .disk-row { margin-bottom: 12px; }
+        .disk-row:last-child { margin-bottom: 0; }
+        .disk-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+        .disk-name { font-size: 13px; font-weight: 600; }
+        .disk-pct {
+            font-family: "Consolas", monospace;
+            font-size: 18px; font-weight: 700;
+            text-shadow: 0 0 12px currentColor, 0 0 24px currentColor;
+        }
+        .disk-meta { font-size: 10px; color: var(--text-muted); margin-top: 3px; }
+
+        /* ===== 响应式 ===== */
+        @media (max-width: 1200px) {
+            .main-grid { grid-template-columns: 1fr 1fr; }
+            .summary-value { font-size: 24px; }
+            .gauge-value { font-size: 36px; }
+        }
+        @media (max-width: 768px) {
+            .main-grid { grid-template-columns: 1fr; }
+            body { overflow-y: auto; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="light-beam"></div>
+<div class="light-beam"></div>
+<div class="light-beam"></div>
+<div class="light-beam"></div>
+
+<div class="topbar">
+    <div class="topbar-left">
+        <div class="pulse-dot"></div>
+        <h1>服 务 器 监 控 大 屏</h1>
+    </div>
+    <div class="topbar-center">
+        <div class="topbar-tag"><span class="label">服务器</span><span class="value" id="server-name">--</span></div>
+        <div class="topbar-divider"></div>
+        <div class="topbar-tag"><span class="label">运行时长</span><span class="value" id="uptime">--</span></div>
+    </div>
+    <div class="topbar-right" id="clock">--:--:--</div>
+</div>
+
+<div class="summary-bar">
+    <div class="summary-card"><div class="summary-value" id="sum-cpu" style="color:var(--green)">--</div><div class="summary-label">CPU 使用率</div></div>
+    <div class="summary-card"><div class="summary-value" id="sum-mem" style="color:var(--green)">--</div><div class="summary-label">内存使用率</div></div>
+    <div class="summary-card"><div class="summary-value" id="sum-disk" style="color:var(--amber)">--</div><div class="summary-label">磁盘峰值</div></div>
+    <div class="summary-card"><div class="summary-value" id="sum-port" style="color:var(--accent)">--</div><div class="summary-label">端口可用</div></div>
+    <div class="summary-card"><div class="summary-value" id="sum-proc" style="color:var(--accent)">--</div><div class="summary-label">进程存活</div></div>
+    <div class="summary-card"><div class="summary-value" id="sum-alert" style="color:var(--red)">0</div><div class="summary-label">活跃告警</div></div>
+</div>
+
+<div class="main-grid">
+    <!-- CPU -->
+    <div class="card" id="card-cpu">
+        <div class="card-title">CPU 处理器</div>
+        <div class="card-body">
+            <div class="cpu-viz">
+                <canvas class="cpu-wave" id="cpu-wave" width="300" height="100"></canvas>
+                <div class="cpu-pct-stack" id="cpu-pct-stack"></div>
+            </div>
+            <div class="progress-track"><div class="progress-fill" id="cpu-fill" style="width:0%"></div></div>
+            <div class="progress-info"><span>警告: 80% / 严重: 90%</span></div>
+        </div>
+    </div>
+
+    <!-- 内存 -->
+    <div class="card" id="card-mem">
+        <div class="card-title">物理内存</div>
+        <div class="card-body">
+            <div class="cpu-viz">
+                <canvas class="cpu-wave" id="mem-wave" width="300" height="100"></canvas>
+                <div class="cpu-pct-stack" id="mem-pct-stack"></div>
+            </div>
+            <div class="progress-track"><div class="progress-fill" id="mem-fill" style="width:0%"></div></div>
+            <div class="progress-info"><span>警告: 85% / 严重: 95%</span><span>已用 <span id="mem-used">--</span> / 总计 <span id="mem-total">--</span> GB</span></div>
+        </div>
+    </div>
+
+    <!-- 磁盘 -->
+    <div class="card" id="card-disk">
+        <div class="card-title">磁盘存储</div>
+        <div class="card-body scroll-list" id="disk-body"></div>
+        </div>
+
+    <!-- 端口 -->
+    <div class="card" id="card-port">
+        <div class="card-title">端口监听</div>
+        <div class="card-body scroll-list" id="port-body"></div>
+        </div>
+
+    <!-- 进程 -->
+    <div class="card" id="card-proc">
+        <div class="card-title">进程守护</div>
+        <div class="card-body scroll-list" id="proc-body"></div>
+        </div>
+
+    <!-- 告警 -->
+    <div class="card" id="card-alert">
+        <div class="card-title">告警事件</div>
+        <div class="card-body scroll-list" id="alert-body"></div>
+        </div>
+</div>
+
+<script>
+    function getHex(val, warn, crit) {
+        if (val >= crit) return '#FF1744';
+        if (val >= warn) return '#FFB300';
+        return '#00FF41';
+    }
+    function hexToRgb(hex) {
+        var r = parseInt(hex.slice(1,3), 16);
+        var g = parseInt(hex.slice(3,5), 16);
+        var b = parseInt(hex.slice(5,7), 16);
+        return r + ',' + g + ',' + b;
+    }
+
+    var startTime = Date.now();
+    var wavePhase = 0;
+
+    // CPU趋势折线图数据（每个物理CPU独立存储）
+    var cpuHistories = {};
+    var MAX_HISTORY = 60;
+    var currentPhysicalCpu = -1;
+    var totalPhysicalCpus = 1;
+    var physicalCpuPcts = [0];
+    var displayCpuPct = 0;
+    var displayMemPct = 0;
+    var cpuSwitchOffset = 0; // 切换翻滚偏移量
+
+    // 绘制CPU趋势折线图（全宽背景）
+    function drawCpuTrend(canvasId, currentPct, history) {
+        var canvas = document.getElementById(canvasId);
+        history = history || [];
+        if (!canvas) return;
+        var parentW = canvas.parentElement.clientWidth;
+        if (!parentW || parentW < 50) return;
+        var w = parentW - 70;
+        if (w < 80) w = 150;
+        // 动态高度：填满卡片body减去进度条空间，60~180px
+        var cardBody = canvas.parentElement.parentElement;
+        var availH = cardBody ? cardBody.clientHeight - 42 : 100;
+        var h = Math.max(60, Math.min(availH, 180));
+        if (canvas.width !== w) canvas.width = w;
+        if (parseInt(canvas.getAttribute('height')) !== h) {
+            canvas.setAttribute('height', h);
+            canvas.style.height = h + 'px';
+        }
+        var pad = Math.floor(h * 0.12); // 上下留白
+        var drawH = h - 2 * pad;
+        var ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, w, h);
+
+        // 阈值线（90%透明度实线）
+        ctx.strokeStyle = 'rgba(255,179,0,0.9)';
+        ctx.lineWidth = 1;
+        var warnY = pad + drawH * 0.2;
+        ctx.beginPath(); ctx.moveTo(0, warnY); ctx.lineTo(w, warnY); ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,23,68,0.9)';
+        var critY = pad + drawH * 0.1;
+        ctx.beginPath(); ctx.moveTo(0, critY); ctx.lineTo(w, critY); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(0, critY); ctx.lineTo(w, critY); ctx.stroke();
+
+        // 填充渐变区域
+        if (history.length > 1) {
+            var stepX = w / (MAX_HISTORY - 1);
+            var bottomY = h - pad;
+            ctx.beginPath();
+            ctx.moveTo(0, bottomY);
+            for (var i = 0; i < history.length; i++) {
+                var x = i * stepX;
+                var y = pad + drawH * (1 - history[i] / 100);
+                ctx.lineTo(x, y);
+            }
+            ctx.lineTo((history.length - 1) * stepX, bottomY);
+            ctx.closePath();
+            var grad = ctx.createLinearGradient(0, pad, 0, bottomY);
+            var fillAlpha = 0.25;
+            if (currentPct >= 90) {
+                grad.addColorStop(0, 'rgba(255,23,68,' + fillAlpha + ')');
+                grad.addColorStop(0.3, 'rgba(255,23,68,' + (fillAlpha * 0.7) + ')');
+                grad.addColorStop(0.8, 'rgba(255,179,0,' + (fillAlpha * 0.3) + ')');
+                grad.addColorStop(1, 'rgba(0,255,65,0.04)');
+            } else if (currentPct >= 80) {
+                grad.addColorStop(0, 'rgba(255,179,0,' + fillAlpha + ')');
+                grad.addColorStop(0.5, 'rgba(255,179,0,' + (fillAlpha * 0.5) + ')');
+                grad.addColorStop(1, 'rgba(0,255,65,0.06)');
+            } else {
+                grad.addColorStop(0, 'rgba(0,255,65,' + (fillAlpha * 0.3) + ')');
+                grad.addColorStop(1, 'rgba(0,255,65,0.02)');
+            }
+            ctx.fillStyle = grad;
+            ctx.fill();
+
+            // 折线
+            ctx.beginPath();
+            ctx.strokeStyle = getHex(currentPct, 80, 90);
+            ctx.lineWidth = 2;
+            ctx.shadowColor = getHex(currentPct, 80, 90);
+            ctx.shadowBlur = 6;
+            for (var i = 0; i < history.length; i++) {
+                var x = i * stepX;
+                var y = pad + drawH * (1 - history[i] / 100);
+                if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+
+        // 切换CPU：CSS翻滚动画
+        if (cpuSwitchOffset > 0 && cpuSwitchOffset < 1) {
+            canvas.style.transform = 'translateY(' + (-cpuSwitchOffset * h * 0.5) + 'px)';
+            canvas.style.opacity = 1 - cpuSwitchOffset * 0.3;
+        }
+    }
+
+    // 绘制内存波浪背景
+    function drawMemBg(canvasId, pct) {
+        var canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+        var parentW = canvas.parentElement.clientWidth;
+        if (!parentW || parentW < 50) return;
+        var w = parentW - 70;
+        if (w < 80) w = 150;
+        var cardBody = canvas.parentElement.parentElement;
+        var availH = cardBody ? cardBody.clientHeight - 42 : 100;
+        var h = Math.max(60, Math.min(availH, 180));
+        if (canvas.width !== w) canvas.width = w;
+        if (parseInt(canvas.getAttribute('height')) !== h) {
+            canvas.setAttribute('height', h);
+            canvas.style.height = h + 'px';
+        }
+        var ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, w, h);
+
+        var pad = Math.floor(h * 0.12);
+        var drawH = h - 2 * pad;
+        var bottomY = h; // 波浪贴底
+
+        // 网格背景
+        // 阈值线（与CPU统一：90%透明度实线）
+        ctx.strokeStyle = 'rgba(255,179,0,0.9)';
+        ctx.lineWidth = 1;
+        var warnY = pad + drawH * 0.15;
+        ctx.beginPath(); ctx.moveTo(0, warnY); ctx.lineTo(w, warnY); ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,23,68,0.9)';
+        var critY = pad + drawH * 0.05;
+        ctx.beginPath(); ctx.moveTo(0, critY); ctx.lineTo(w, critY); ctx.stroke();
+        ctx.lineWidth = 0.8;
+
+        var barCount = Math.floor(w / 8);
+        var barW = (w / barCount) * 0.75;
+        var gap = (w / barCount) * 0.25;
+        wavePhase = (wavePhase + 0.02) % (2 * Math.PI);
+
+        var memRgb = hexToRgb(getHex(pct, 85, 95));
+        for (var i = 0; i < barCount; i++) {
+            var wave = Math.sin(i * 0.4 + wavePhase) * 0.3 + Math.sin(i * 0.7 + wavePhase * 1.5) * 0.15;
+            var barH = (pct / 100) * drawH * (0.5 + 0.5 * (0.5 + wave));
+            var x = i * (barW + gap);
+            var y = bottomY - barH;
+            var t = barH / drawH;
+            var alpha = (0.12 + t * 0.22).toFixed(2);
+            ctx.fillStyle = 'rgba(' + memRgb + ',' + alpha + ')';
+            ctx.fillRect(x, y, barW, barH);
+        }
+    }
+
+    // 持续绘制
+    var waveAnimId = null;
+    var lastCpuAdd = 0;
+    function startWaveAnim() {
+        if (waveAnimId) cancelAnimationFrame(waveAnimId);
+        function loop(ts) {
+            // CPU切换翻滚动画
+            if (cpuSwitchOffset > 0.01) {
+                cpuSwitchOffset *= 0.97;
+            } else if (cpuSwitchOffset > 0) {
+                cpuSwitchOffset = 0;
+                var cvs = document.getElementById('cpu-wave');
+                if (cvs) { cvs.style.transform = ''; cvs.style.opacity = ''; }
+            }
+
+            // 每2秒采样当前CPU数据
+            if (ts - lastCpuAdd > 2000 && displayCpuPct > 0) {
+                var hist = cpuHistories[currentPhysicalCpu] || [];
+                hist.push(displayCpuPct);
+                if (hist.length > MAX_HISTORY) hist.shift();
+                cpuHistories[currentPhysicalCpu] = hist;
+                lastCpuAdd = ts;
+            }
+
+            drawCpuTrend('cpu-wave', displayCpuPct, cpuHistories[currentPhysicalCpu] || []);
+            drawMemBg('mem-wave', displayMemPct);
+            waveAnimId = requestAnimationFrame(loop);
+        }
+        requestAnimationFrame(loop);
+    }
+    startWaveAnim();
+
+    function formatUptime(sec) {
+        var d = Math.floor(sec / 86400);
+        var h = Math.floor((sec % 86400) / 3600);
+        var m = Math.floor((sec % 3600) / 60);
+        var s = Math.floor(sec % 60);
+        var parts = [];
+        if (d) parts.push(d + '天');
+        if (h) parts.push(h + '时');
+        if (m) parts.push(m + '分');
+        parts.push(s + '秒');
+        return parts.join(' ');
+    }
+
+    function updateClock() {
+        var now = new Date();
+        document.getElementById('clock').textContent =
+            String(now.getHours()).padStart(2,'0') + ':' +
+            String(now.getMinutes()).padStart(2,'0') + ':' +
+            String(now.getSeconds()).padStart(2,'0');
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    function refresh() {
+        fetch('/api/status')
+            .then(function(r) { return r.json(); })
+            .then(function(resp) {
+                var d = resp.data;
+                var cpu = d.cpu.percent || 0;
+                var mem = d.memory.percent || 0;
+                var disks = d.disks || [];
+                var ports = d.ports || [];
+                var procs = d.processes || [];
+                var alerts = d.alerts || [];
+                var upPorts = ports.filter(function(p) { return p.reachable; }).length;
+                var runningProcs = procs.filter(function(p) { return p.running; }).length;
+                var maxDisk = disks.length ? Math.max.apply(null, disks.map(function(dd) { return dd.percent; })) : 0;
+                var alertingCount = alerts.filter(function(a) { return a.is_alerting; }).length;
+
+                var uptimeSec = (d.stats && d.stats.uptime_seconds) || ((Date.now() - startTime) / 1000);
+                document.getElementById('uptime').textContent = formatUptime(uptimeSec);
+                document.getElementById('server-name').textContent = d.server_name;
+
+                // 摘要条
+                document.getElementById('sum-cpu').textContent = cpu.toFixed(1) + '%';
+                document.getElementById('sum-cpu').style.color = getHex(cpu, 80, 90);
+                document.getElementById('sum-mem').textContent = mem.toFixed(1) + '%';
+                document.getElementById('sum-mem').style.color = getHex(mem, 85, 95);
+                document.getElementById('sum-disk').textContent = maxDisk.toFixed(1) + '%';
+                document.getElementById('sum-disk').style.color = getHex(maxDisk, 90, 95);
+                document.getElementById('sum-port').textContent = upPorts + ' / ' + ports.length;
+                document.getElementById('sum-port').style.color = upPorts === ports.length ? 'var(--green)' : 'var(--amber)';
+                document.getElementById('sum-proc').textContent = runningProcs + ' / ' + procs.length;
+                document.getElementById('sum-proc').style.color = runningProcs === procs.length ? 'var(--green)' : 'var(--amber)';
+                document.getElementById('sum-alert').textContent = alertingCount;
+                document.getElementById('sum-alert').style.color = alertingCount > 0 ? 'var(--red)' : 'var(--green)';
+
+                // CPU - 多物理CPU双行显示 + 指示灯
+                totalPhysicalCpus = d.cpu.physical_cpus || 1;
+                physicalCpuPcts = d.cpu.physical_percents || [cpu];
+                // 每5秒高亮切换
+                var prevCpu = currentPhysicalCpu;
+                if (totalPhysicalCpus > 1) {
+                    currentPhysicalCpu = Math.floor(Date.now() / 5000) % totalPhysicalCpus;
+                } else {
+                    currentPhysicalCpu = 0;
+                }
+                if (currentPhysicalCpu !== prevCpu && prevCpu >= 0) {
+                    cpuSwitchOffset = 1; // 开始翻滚动画
+                }
+                // 确保每个CPU都有独立的历史数组，从0开始
+                if (!cpuHistories[currentPhysicalCpu]) {
+                    cpuHistories[currentPhysicalCpu] = [0];
+                }
+                var currentCpuPct = physicalCpuPcts[currentPhysicalCpu] || cpu;
+                displayCpuPct = currentCpuPct;
+                var cpuColor = getHex(currentCpuPct, 80, 90);
+                document.getElementById('cpu-fill').style.width = currentCpuPct + '%';
+                document.getElementById('cpu-fill').style.background = cpuColor;
+                document.getElementById('card-cpu').classList.toggle('alert-active', currentCpuPct >= 90);
+
+                // 渲染多行CPU百分比
+                var stackHtml = '';
+                for (var p = 0; p < totalPhysicalCpus; p++) {
+                    var pct = physicalCpuPcts[p] || 0;
+                    var isActive = (p === currentPhysicalCpu);
+                    var cls = isActive ? 'cpu-pct-row active' : 'cpu-pct-row inactive';
+                    var color = isActive ? getHex(pct, 80, 90) : '';
+                    stackHtml += '<div class=\"' + cls + '\" style=\"' + (isActive ? 'color:' + color : '') + '\"><div style=\"font-size:10px;color:var(--text-muted);line-height:1.2\">CPU' + p + '</div><div style=\"line-height:1.3\">' + pct.toFixed(1) + '%</div></div>';
+                }
+                document.getElementById('cpu-pct-stack').innerHTML = stackHtml;
+
+                // 内存
+                displayMemPct = mem;
+                var memColor = getHex(mem, 85, 95);
+                document.getElementById('mem-pct-stack').innerHTML =
+                    '<div class=\"cpu-pct-row active\" style=\"color:' + memColor + '\"><div style=\"font-size:10px;color:var(--text-muted);line-height:1.2\">内存</div><div style=\"line-height:1.3\">' + mem.toFixed(1) + '%</div></div>';
+                document.getElementById('mem-fill').style.width = mem + '%';
+                document.getElementById('mem-fill').style.background = memColor;
+                document.getElementById('mem-used').textContent = ((d.memory.total_gb||0) - (d.memory.available_gb||0)).toFixed(1);
+                document.getElementById('mem-total').textContent = (d.memory.total_gb || 0).toFixed(1);
+                document.getElementById('card-mem').classList.toggle('alert-active', mem >= 95);
+
+                // 磁盘
+                var diskHtml = '';
+                disks.forEach(function(disk) {
+                    var dc = getHex(disk.percent, 90, 95);
+                    diskHtml +=
+                        '<div class="disk-row">' +
+                        '<div class="disk-header"><span class="disk-name">' + disk.device + '</span><span class="disk-pct" style="color:' + dc + '">' + disk.percent.toFixed(1) + '%</span></div>' +
+                        '<div class="progress-track"><div class="progress-fill" style="width:' + disk.percent + '%;background:' + dc + '"></div></div>' +
+                        '<div class="disk-meta">可用 ' + disk.free_gb.toFixed(1) + ' GB　/　共 ' + disk.total_gb.toFixed(1) + ' GB</div>' +
+                        '</div>';
+                });
+                safeSetHtml('disk-body', diskHtml || '<div style="color:var(--text-muted);text-align:center;padding:20px">无磁盘数据</div>');
+                document.getElementById('card-disk').classList.toggle('alert-active', maxDisk >= 95);
+                checkAutoScroll('disk-body');
+
+                // 端口
+                var portHtml = '';
+                ports.forEach(function(p) {
+                    var key = p.address;
+                    var prev = lastPortStatus[key];
+                    var changed = (prev !== undefined && prev !== p.reachable);
+                    lastPortStatus[key] = p.reachable;
+                    portHtml +=
+                        '<div class="status-row' + (changed ? ' status-changed' : '') + '">' +
+                        '<span class="status-name"><span class="status-dot ' + (p.reachable ? 'dot-ok' : 'dot-err') + '"></span>' + p.address + '</span>' +
+                        '<span class="pill ' + (p.reachable ? 'pill-up' : 'pill-down') + '">' + (p.reachable ? '正常' : '异常') + '</span>' +
+                        '</div>';
+                });
+                safeSetHtml('port-body', portHtml || '<div style="color:var(--text-muted);text-align:center;padding:20px">无端口配置</div>');
+                document.getElementById('card-port').classList.toggle('alert-active', upPorts < ports.length);
+                checkAutoScroll('port-body');
+
+                // 进程
+                var procHtml = '';
+                procs.forEach(function(p) {
+                    var key = p.name;
+                    var prev = lastProcStatus[key];
+                    var changed = (prev !== undefined && prev !== p.running);
+                    lastProcStatus[key] = p.running;
+                    procHtml +=
+                        '<div class="status-row' + (changed ? ' status-changed' : '') + '">' +
+                        '<span class="status-name"><span class="status-dot ' + (p.running ? 'dot-ok' : 'dot-err') + '"></span>' + p.name + '</span>' +
+                        '<span class="pill ' + (p.running ? 'pill-active' : 'pill-dead') + '">' + (p.running ? '运行中' : '已停止') + '</span>' +
+                        '</div>';
+                });
+                safeSetHtml('proc-body', procHtml || '<div style="color:var(--text-muted);text-align:center;padding:20px">无进程配置</div>');
+                document.getElementById('card-proc').classList.toggle('alert-active', runningProcs < procs.length);
+                checkAutoScroll('proc-body');
+
+                // 告警
+                var alertHtml = '';
+                alerts.forEach(function(a) {
+                    alertHtml +=
+                        '<div class="status-row">' +
+                        '<span class="status-name"><span class="status-dot ' + (a.is_alerting ? 'dot-err' : 'dot-ok') + '"></span>' + a.key + '</span>' +
+                        '<span>' +
+                        '<span class="pill ' + (a.is_alerting ? 'pill-alert' : 'pill-normal') + '">' + (a.is_alerting ? '告警中' : '正常') + '</span>' +
+                        '<span class="pill pill-count">x' + a.count + '</span>' +
+                        '</span></div>';
+                });
+                safeSetHtml('alert-body', alertHtml || '<div style="color:var(--text-muted);text-align:center;padding:20px">无告警事件</div>');
+                document.getElementById('card-alert').classList.toggle('alert-active', alertingCount > 0);
+                checkAutoScroll('alert-body');
+            })
+            .catch(function(err) {
+                console.error('数据获取失败:', err);
+            });
+    }
+
+    // ===== 超出行数自动滚动 =====
+    var scrollTimers = {};
+    var lastContent = {}; // 记录上次渲染的内容，避免无变化时重置DOM
+    var lastPortStatus = {};  // 记录端口状态，变化时闪烁
+    var lastProcStatus = {};  // 记录进程状态，变化时闪烁
+
+    refresh();
+    setInterval(refresh, 5000);
+
+    // 安全更新容器内容：内容不变不替换DOM，防止scrollTop归零
+    function safeSetHtml(containerId, html) {
+        if (lastContent[containerId] === html) return; // 内容没变，跳过
+        lastContent[containerId] = html;
+        var el = document.getElementById(containerId);
+        if (el) el.innerHTML = html;
+    }
+
+    function checkAutoScroll(containerId) {
+        var el = document.getElementById(containerId);
+        if (!el) return;
+
+        var viewH = el.clientHeight;
+        var totalH = el.scrollHeight;
+        if (totalH <= viewH + 4) {
+            if (scrollTimers[containerId]) {
+                scrollTimers[containerId].active = false;
+                delete scrollTimers[containerId];
+            }
+            return;
+        }
+
+        var maxScroll = totalH - viewH;
+
+        // 已有动画 → 只更新max
+        if (scrollTimers[containerId]) {
+            scrollTimers[containerId].max = maxScroll;
+            return;
+        }
+
+        var state = { dir: 1, max: maxScroll, active: true, pauseUntil: 0 };
+        scrollTimers[containerId] = state;
+        var lastTime = 0;
+        var pos = 0;   // 目标滚动位置
+        var speed = 25; // px/s
+
+        function frame(ts) {
+            if (!state.active) return;
+            if (!lastTime) lastTime = ts;
+            var dt = Math.min((ts - lastTime) / 1000, 0.2); // 最大200ms步长防止跳帧
+            lastTime = ts;
+
+            // 初始停留2秒
+            if (ts < 2000 && pos === 0) {
+                requestAnimationFrame(frame);
+                return;
+            }
+
+            var el2 = document.getElementById(containerId);
+            if (!el2) { requestAnimationFrame(frame); return; }
+
+            // 暂停期
+            var now = performance.now();
+            if (now < state.pauseUntil) {
+                requestAnimationFrame(frame);
+                return;
+            }
+
+            // 移动
+            pos += state.dir * speed * dt;
+            if (pos >= state.max) {
+                pos = state.max;
+                state.dir = -1;
+                state.pauseUntil = now + 3000;
+            } else if (pos <= 0) {
+                pos = 0;
+                state.dir = 1;
+                state.pauseUntil = now + 3000;
+            }
+            el2.scrollTop = Math.round(pos);
+
+            requestAnimationFrame(frame);
+        }
+
+        requestAnimationFrame(frame);
+    }
+
+</script>
+
+</body>
+</html>

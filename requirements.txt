@@ -1,0 +1,5 @@
+psutil==5.9.8
+pyyaml==6.0.1
+requests==2.31.0
+pywin32==306
+flask==3.0.3

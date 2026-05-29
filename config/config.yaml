@@ -1,0 +1,113 @@
+server:
+  name: "Windows-Server-01"
+
+system_monitor:
+  interval: 5
+  cpu:
+    warning_threshold: 80
+    critical_threshold: 90
+    consecutive_count: 3
+    cooldown: 300
+  memory:
+    warning_threshold: 85
+    critical_threshold: 95
+    consecutive_count: 3
+    cooldown: 300
+  disk:
+    warning_threshold: 90
+    critical_threshold: 95
+    consecutive_count: 3
+    cooldown: 300
+    exclude: ["A:", "B:"]
+
+port_monitor:
+  interval: 30
+  timeout: 5
+  consecutive_count: 2
+  cooldown: 300
+  ports:
+    - "127.0.0.1:80"
+    - "127.0.0.1:443"
+    - "127.0.0.1:3306"
+
+process_monitor:
+  interval: 30
+  consecutive_count: 2
+  cooldown: 300
+  processes:
+    - "nginx.exe"
+    - "mysqld.exe"
+    - "tomcat9.exe"
+
+webhook:
+  urls:
+    - "https://open.feishu.cn/open-apis/bot/v2/hook/5f1577d8-d6cf-4b8c-9868-431bbc946980"
+  timeout: 10
+  retry_count: 3
+  retry_interval: 5
+
+# ---------------------------------------------------------------------
+# Web 管理界面配置
+# ---------------------------------------------------------------------
+web_dashboard:
+  enabled: true               # 是否启用 Web 管理界面（true / false）
+  host: "0.0.0.0"             # 监听地址，0.0.0.0 表示允许外部访问，127.0.0.1 仅本机
+  port: 5000                  # 监听端口，范围 1024-65535
+
+# ---------------------------------------------------------------------
+# 邮件通知配置
+# ---------------------------------------------------------------------
+# 推荐 SMTP 服务器（端口 465=SSL，587=STARTTLS）：
+#   QQ邮箱:    smtp.qq.com          端口 465   sender_email: 你的QQ号@qq.com
+#   163邮箱:   smtp.163.com         端口 465   sender_email: 你的邮箱@163.com
+#   Gmail:     smtp.gmail.com       端口 587   use_ssl: false
+#   企业微信:   smtp.exmail.qq.com   端口 465
+# 注意: sender_password 不是邮箱登录密码！
+#   QQ邮箱 → 登录 mail.qq.com → 设置 → 账户 → POP3/SMTP服务 → 生成授权码
+#   163邮箱 → 登录 mail.163.com → 设置 → POP3/SMTP/IMAP → 新增授权码
+email:
+  enabled: false              # 是否启用邮件通知（true / false）
+  smtp_server: "smtp.qq.com"  # SMTP 服务器地址
+  smtp_port: 465              # SMTP 端口，SSL 通常 465，STARTTLS 通常 587
+  use_ssl: true               # 是否使用 SSL 连接（true = SSL直连, false = STARTTLS）
+  sender_email: "your_email@qq.com"    # 发件人邮箱地址
+  sender_password: "your_authorization_code"  # 发件人邮箱授权码（非登录密码！）
+  receiver_emails:             # 收件人邮箱列表，可配置多个
+    - "admin@example.com"
+    - "ops@example.com"
+
+# ---------------------------------------------------------------------
+# 心跳检测配置
+# ---------------------------------------------------------------------
+heartbeat:
+  interval: 60                # 心跳间隔（秒），范围 30-600
+  webhook_enabled: false      # 是否推送心跳到 Webhook（true 开启 / false 关闭）
+
+# ---------------------------------------------------------------------
+# 告警静默时段配置
+# ---------------------------------------------------------------------
+# 在指定时间段内，对应等级的告警不会通过 Webhook/邮件推送
+# 适用场景：夜间维护窗口、计划内停机时段
+# 注意：严重（critical）级别告警默认不受静默影响，建议仅静默 warning
+alert_silence:
+  enabled: false              # 是否启用静默时段（true / false）
+  periods:                    # 静默时间段列表，可配置多个
+    - start: "22:00"          # 静默开始时间（HH:MM 24小时制）
+      end: "06:00"            # 静默结束时间（HH:MM 24小时制，跨天自动处理）
+      level: "warning"        # 静默级别：warning（仅静默警告） / all（静默所有级别）
+      # 示例：每晚22:00到次日06:00 静默所有 警告 级别告警，严重告警正常发送
+
+# ---------------------------------------------------------------------
+# 数据存储配置
+# ---------------------------------------------------------------------
+metrics_store:
+  max_records: 1000           # 内存中保留的最大记录数，范围 100-10000
+
+# ---------------------------------------------------------------------
+# 日志配置
+# ---------------------------------------------------------------------
+logging:
+  level: "INFO"
+  file: "logs/monitor.log"
+  max_size: 10
+  backup_count: 5
