@@ -1,5 +1,5 @@
 server:
-  name: "Windows-Server-01"
+  name: "Server-01"
 
 system_monitor:
   interval: 5
