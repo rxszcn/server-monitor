@@ -2,38 +2,38 @@ server:
   name: "Server-01"
 
 system_monitor:
-  interval: 5
+  interval: 5                  # 采集间隔(秒)，范围 1-60
   cpu:
-    warning_threshold: 80
-    critical_threshold: 90
-    consecutive_count: 3
-    cooldown: 300
+    warning_threshold: 80      # 警告阈值(%)
+    critical_threshold: 90     # 严重阈值(%)
+    consecutive_count: 5       # 连续超阈值次数才触发（5次×5秒=25秒持续高负载）
+    cooldown: 600              # 冷却时间(秒)，同指标10分钟内不重复告警
   memory:
-    warning_threshold: 85
-    critical_threshold: 95
-    consecutive_count: 3
-    cooldown: 300
+    warning_threshold: 80      # 警告阈值(%)
+    critical_threshold: 90     # 严重阈值(%)
+    consecutive_count: 3       # 连续超阈值次数才触发（3次×5秒=15秒）
+    cooldown: 600
   disk:
-    warning_threshold: 90
-    critical_threshold: 95
-    consecutive_count: 3
-    cooldown: 300
-    exclude: ["A:", "B:"]
+    warning_threshold: 80      # 警告阈值(%)
+    critical_threshold: 90     # 严重阈值(%)
+    consecutive_count: 2       # 连续超阈值次数才触发（2次×5秒=10秒）
+    cooldown: 600
+    exclude: ["A:", "B:"]      # 排除的磁盘盘符（Linux 改为挂载点）
 
 port_monitor:
-  interval: 30
-  timeout: 5
-  consecutive_count: 2
-  cooldown: 300
+  interval: 30                 # 检测间隔(秒)
+  timeout: 5                   # 连接超时(秒)
+  consecutive_count: 3         # 连续不可达次数才告警（3次×30秒=90秒）
+  cooldown: 600
   ports:
     - "127.0.0.1:80"
     - "127.0.0.1:443"
     - "127.0.0.1:3306"
 
 process_monitor:
-  interval: 30
-  consecutive_count: 2
-  cooldown: 300
+  interval: 30                 # 检测间隔(秒)
+  consecutive_count: 3         # 连续不存在次数才告警（3次×30秒=90秒）
+  cooldown: 600
   processes:
     - "nginx.exe"
     - "mysqld.exe"
